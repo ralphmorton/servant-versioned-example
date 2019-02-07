@@ -34,13 +34,18 @@ type SupportedVersions = '["v1", "v2"]
 
 type TestVersionedAPI = QueryParam "bar" String :> ConcreteHeader "X-Foo" String :>
     (
-        Get '[JSON] Bool
+        Get '[JSON] String
         :<|>
-        Versions '["v1"] :> "info" :> Get '[JSON] String
+        Versions '["v1"] :> "info" :> Capture "foo" String :> Get '[JSON] String
         :<|>
-        "add" :> Versions '["v2"] :> Capture "x" Int :> Capture "y" Int :> Post '[JSON] Int
+        Capture "x" Int :> Capture "y" Int :> Versions '["v2"] :> "add" :> Get '[JSON] Int
         :<|>
-        Post '[JSON] Double
+        "alt-impl" :>
+            (
+                Versions '["v1"] :> Post '[JSON] String
+                :<|>
+                Versions '["v2"] :> Post '[JSON] String
+            )
     )
 
 -- Specify a server for the API. The required server type is not affected by
@@ -48,14 +53,19 @@ type TestVersionedAPI = QueryParam "bar" String :> ConcreteHeader "X-Foo" String
 
 testServerUnversioned :: Server TestVersionedAPI
 testServerUnversioned bar fooHeader =
-    pure True
-    :<|>
-    pure (show (bar, fooHeader))
-    :<|>
-    (\x y -> pure $ x + y)
-    :<|>
-    pure 42
-
+    (
+        pure "hello"
+        :<|>
+        (\foo -> (pure . show) (bar, fooHeader, foo))
+        :<|>
+        (\x y -> pure (x + y))
+        :<|>
+        (
+            pure "v1 impl"
+            :<|>
+            pure "v2 impl"
+        )
+    )
 
 -- Transform the un-versioned server into a versioned server. A versioned API
 -- is a set of alternative APIs (one for each supported version), each prefixed
@@ -74,27 +84,27 @@ testServerVersioned = versionedServer supported api badVersion testServerUnversi
 EXAMPLES:
 
 Request: GET http://localhost:8080/v1
-Response: 200 true
+Response: 200 "hello"
 
 Request: GET http://localhost:8080/v2
-Response: 200 true
+Response: 200 "hello"
 
-Request: GET http://localhost:8080/v1/info?bar=barval
-Response: 200 (Just "barval",Nothing)
+Request: GET http://localhost:8080/v1/info/info-val
+Response: 200 "(Nothing,Nothing,\"info-val\")"
 
-Request: GET http://localhost:8080/v2/info?bar=barval
+Request: GET http://localhost:8080/v2/info/info-val
 Response: 404
 
-Request: POST http://localhost:8080/v1/add/1/2
+Request: GET http://localhost:8080/v1/1/2/add
 Response: 404
 
-Request: POST http://localhost:8080/v2/add/1/2
+Request: GET http://localhost:8080/v2/1/2/add
 Response: 200 3
 
-Request: POST http://localhost:8080/v1
-Response: 200 42
+Request: POST http://localhost:8080/v1/alt-impl
+Response: 200 "v1 impl"
 
-Request: POST: http://localhost:8080/v2
-Response: 200 42
+Request: POST: http://localhost:8080/v2/alt-impl
+Response: 200 "v2 impl"
 
 --}

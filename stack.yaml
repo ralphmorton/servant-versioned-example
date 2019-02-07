@@ -65,4 +65,4 @@ packages:
 # compiler-check: newer-minor
 extra-deps:
 - git: https://github.com/collegevine/servant-versioned.git
-  commit: 039748e82845d1a0f6ca24a5706f32cceb24e553
+  commit: f5ce5411bff68a92cb50dc3644a5e2146caaf845
